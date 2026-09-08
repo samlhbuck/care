@@ -1,1 +1,2 @@
-# care
+# CARE Response Explorer
+A tool to look at how Seattle's Community Assisted Response and Engagement department responds to dispatch calls alone, accompanied by the Seattle Police Department, and compared to SPD alone.
