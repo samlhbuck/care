@@ -116,12 +116,22 @@ TIME_PERIOD_OPTIONS = [
     {"label": "Custom dates", "value": "custom"},
 ]
 
+# Helper functions
+def dates_are_valid(start_date, end_date):
+    if not start_date or not end_date:
+        return False
+
+    return (
+        date.fromisoformat(start_date)
+        <= date.fromisoformat(end_date)
+    )
 def optional_float(value):
     try:
         return float(value)
     except (TypeError, ValueError):
         return None
 
+# Main functions
 @lru_cache(maxsize=32)
 def fetch_event_type_options(start_date, end_date):
     start = date.fromisoformat(start_date)
@@ -344,7 +354,6 @@ app.layout = html.Main(
                 ),
                 html.Div(
                     [
-                        
                         html.Div(
                             [
                                 html.Label("Start date"),
@@ -384,6 +393,11 @@ app.layout = html.Main(
                     ],
                     className="date-fields"
                 ),
+                html.Div(
+                    id="date-error",
+                    className="form-error",
+                    role="alert",
+                )
             ],
             className = "filter-grid"),
 
@@ -394,6 +408,20 @@ app.layout = html.Main(
         )
     ], className = "filter-grid"
 )
+# Callbacks
+@callback(
+    Output("date-error", "children"),
+    Input("start-date", "date"),
+    Input("end-date", "date"),
+)
+def display_date_error(start_date, end_date):
+    if not start_date or not end_date:
+        return "Select both a start date and an end date."
+
+    if not dates_are_valid(start_date, end_date):
+        return "Start date must be on or before the end date."
+
+    return ""
 
 @callback(
     Output("start-date", "date"),
@@ -463,6 +491,9 @@ def update_date_range(time_period):
 def update_event_type_options(start_date, end_date):
     if not start_date or not end_date:
         return []
+    
+    if not dates_are_valid(start_date, end_date):
+        return no_update
 
     return fetch_event_type_options(start_date, end_date)
 
@@ -483,6 +514,9 @@ def update_dashboard(response_categories, event_type, start_date, end_date):
 
     if not start_date or not end_date:
         return px.bar(title="Select a date range")
+
+    if not dates_are_valid(start_date, end_date):
+        return no_update
 
     events = fetch_events(
         tuple(sorted(response_categories)),
