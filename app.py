@@ -1,5 +1,6 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from functools import lru_cache
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import plotly.express as px
@@ -96,7 +97,7 @@ class Columns:
 
 
 PROGRAM_START = date(2023, 10, 26)
-TODAY = date.today()
+TODAY = datetime.now(tz=ZoneInfo("America/Los_Angeles")).date()
 
 COMPLETED_YEAR_OPTIONS = [
     {
@@ -109,6 +110,7 @@ COMPLETED_YEAR_OPTIONS = [
 TIME_PERIOD_OPTIONS = [
     {"label": "Full program", "value": "full-program"},
     {"label": "Last 90 days", "value": "last-90-days"},
+    {"label": "Previous 90 days", "value":"previous-90-days"},
     {"label": "Last 365 days", "value": "last-365-days"},
     {"label": "Year to date", "value": "year-to-date"},
     {"label": "Previous quarter", "value": "previous-quarter"},
@@ -360,7 +362,7 @@ app.layout = html.Main(
                                 dcc.DatePickerSingle(
                                     id="start-date",
                                     min_date_allowed=date(2023, 10, 26),
-                                    max_date_allowed=date.today(),
+                                    max_date_allowed=datetime.now(tz=ZoneInfo("America/Los_Angeles")).date(),
                                     date=date(2023, 10, 26),
                                     display_format="MMM D, YYYY",
                                     month_format="YYYY MMMM",
@@ -376,8 +378,8 @@ app.layout = html.Main(
                                 dcc.DatePickerSingle(
                                     id="end-date",
                                     min_date_allowed=date(2023, 10, 26),
-                                    max_date_allowed=date.today(),
-                                    date=date.today(),
+                                    max_date_allowed=datetime.now(tz=ZoneInfo("America/Los_Angeles")).date(),
+                                    date=datetime.now(tz=ZoneInfo("America/Los_Angeles")).date(),
                                     display_format="MMM D, YYYY",
                                     month_format="YYYY MMMM",
                                     clearable=False,
@@ -432,7 +434,7 @@ def display_date_error(start_date, end_date):
     prevent_initial_call=True,
 )
 def update_date_range(time_period):
-    today = date.today()
+    today = datetime.now(tz=ZoneInfo("America/Los_Angeles")).date()
 
     if time_period == "custom":
         return no_update, no_update, False, False
@@ -444,6 +446,10 @@ def update_date_range(time_period):
     elif time_period == "last-90-days":
         start = today - timedelta(days=89)
         end = today
+    
+    elif time_period == "previous-90-days":
+        start = today - timedelta(days=179)
+        end = today - timedelta(days=89)
 
     elif time_period == "last-365-days":
         start = today - timedelta(days=364)
