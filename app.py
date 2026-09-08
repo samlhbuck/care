@@ -12,92 +12,66 @@ ENDPOINT = "https://data.seattle.gov/resource/33kz-ixgy.json"
 
 
 class Columns:
-    # Event identity and classification
+    # Fields used by the current response-time view
     EVENT_ID = "cad_event_number"
     RESPONSE_CATEGORY = "cad_event_response_category"
     CALL_TYPE_INDICATOR = "call_type_indicator"
     INITIAL_CALL_TYPE = "initial_call_type"
-    FINAL_CALL_TYPE = "final_call_type"
-    EVENT_GROUP = "event_group"
-    PRIORITY = "priority"
-    CLEARANCE_DESCRIPTION = "cad_event_clearance_description"
-
-    # Geography
-    PRECINCT = "dispatch_precinct"
-    SECTOR = "dispatch_sector"
-    BEAT = "dispatch_beat"
-    NEIGHBORHOOD = "dispatch_neighborhood"
-    ADDRESS = "dispatch_address"
-    LATITUDE = "dispatch_latitude"
-    LONGITUDE = "dispatch_longitude"
-    CENSUS_BLOCK = "census_block_2020"
-
-    # Overall event timing
     QUEUED_TIME = "cad_event_original_time_queued"
-    ARRIVED_TIME = "cad_event_arrived_time"
     EVENT_FIRST_RESPONSE_SECONDS = "cad_event_first_response_time_s_"
 
-    # First CARE unit
-    CARE_DISPATCH_TIME = "first_care_call_sign_dispatch_time"
-    CARE_ARRIVAL_TIME = "first_care_call_sign_at_scene_time"
-    CARE_LAST_IN_SERVICE_TIME = "last_care_call_sign_in_service_time"
-    CARE_DISPATCH_DELAY_SECONDS = (
-        "first_care_call_sign_dispatch_delay_time_s_"
-    )
-    CARE_RESPONSE_SECONDS = (
-        "first_care_call_sign_response_time_s_"
-    )
-    CARE_TOTAL_SERVICE_SECONDS = (
-        "care_call_sign_total_service_time_s_"
-    )
+    # Future views: classification and geography
+    # FINAL_CALL_TYPE = "final_call_type"
+    # EVENT_GROUP = "event_group"
+    # PRIORITY = "priority"
+    # CLEARANCE_DESCRIPTION = "cad_event_clearance_description"
+    # PRECINCT = "dispatch_precinct"
+    # SECTOR = "dispatch_sector"
+    # BEAT = "dispatch_beat"
+    # NEIGHBORHOOD = "dispatch_neighborhood"
+    # ADDRESS = "dispatch_address"
+    # LATITUDE = "dispatch_latitude"
+    # LONGITUDE = "dispatch_longitude"
+    # CENSUS_BLOCK = "census_block_2020"
 
-    # First SPD unit
-    SPD_DISPATCH_TIME = "first_spd_call_sign_dispatch_time"
-    SPD_ARRIVAL_TIME = "first_spd_call_sign_at_scene_time"
-    SPD_LAST_IN_SERVICE_TIME = "last_spd_call_sign_in_service_time"
-    SPD_DISPATCH_DELAY_SECONDS = (
-        "first_spd_call_sign_dispatch_delay_time_s_"
-    )
-    SPD_RESPONSE_SECONDS = (
-        "first_spd_call_sign_response_time_s_"
-    )
-    SPD_TOTAL_SERVICE_SECONDS = (
-        "spd_call_sign_total_service_time_s_"
-    )
-
-    # SPD/CARE co-response
-    CO_RESPONSE_DISPATCH_TIME = (
-        "first_co_response_call_sign_dispatch_time"
-    )
-    CO_RESPONSE_ARRIVAL_TIME = (
-        "first_co_response_call_sign_at_scene_time"
-    )
-    CO_RESPONSE_LAST_IN_SERVICE_TIME = (
-        "last_co_response_call_sign_in_service_time"
-    )
-    CO_RESPONSE_DISPATCH_DELAY_SECONDS = (
-        "first_co_response_call_sign_dispatch_delay_time_s_"
-    )
-    CO_RESPONSE_RESPONSE_SECONDS = (
-        "first_co_response_call_sign_response_time_s_"
-    )
-    CO_RESPONSE_TOTAL_SERVICE_SECONDS = (
-        "co_response_call_sign_total_service_time_s_"
-    )
-
-    # Individual dispatched-unit measurements
-    CALL_SIGN_DISPATCH_TIME = "call_sign_dispatch_time"
-    CALL_SIGN_ARRIVAL_TIME = "call_sign_at_scene_time"
-    CALL_SIGN_IN_SERVICE_TIME = "call_sign_in_service_time"
-    CALL_SIGN_DISPATCH_DELAY_SECONDS = (
-        "call_sign_dispatch_delay_time_s_"
-    )
-    CALL_SIGN_RESPONSE_SECONDS = "call_sign_response_time_s_"
-    CALL_SIGN_SERVICE_SECONDS = "call_sign_total_service_time_s_"
+    # Future views: event and unit timing
+    # ARRIVED_TIME = "cad_event_arrived_time"
+    # CARE_DISPATCH_TIME = "first_care_call_sign_dispatch_time"
+    # CARE_ARRIVAL_TIME = "first_care_call_sign_at_scene_time"
+    # CARE_LAST_IN_SERVICE_TIME = "last_care_call_sign_in_service_time"
+    # CARE_DISPATCH_DELAY_SECONDS = "first_care_call_sign_dispatch_delay_time_s_"
+    # CARE_RESPONSE_SECONDS = "first_care_call_sign_response_time_s_"
+    # CARE_TOTAL_SERVICE_SECONDS = "care_call_sign_total_service_time_s_"
+    # SPD_DISPATCH_TIME = "first_spd_call_sign_dispatch_time"
+    # SPD_ARRIVAL_TIME = "first_spd_call_sign_at_scene_time"
+    # SPD_LAST_IN_SERVICE_TIME = "last_spd_call_sign_in_service_time"
+    # SPD_DISPATCH_DELAY_SECONDS = "first_spd_call_sign_dispatch_delay_time_s_"
+    # SPD_RESPONSE_SECONDS = "first_spd_call_sign_response_time_s_"
+    # SPD_TOTAL_SERVICE_SECONDS = "spd_call_sign_total_service_time_s_"
+    # CO_RESPONSE_DISPATCH_TIME = "first_co_response_call_sign_dispatch_time"
+    # CO_RESPONSE_ARRIVAL_TIME = "first_co_response_call_sign_at_scene_time"
+    # CO_RESPONSE_LAST_IN_SERVICE_TIME = "last_co_response_call_sign_in_service_time"
+    # CO_RESPONSE_DISPATCH_DELAY_SECONDS = "first_co_response_call_sign_dispatch_delay_time_s_"
+    # CO_RESPONSE_RESPONSE_SECONDS = "first_co_response_call_sign_response_time_s_"
+    # CO_RESPONSE_TOTAL_SERVICE_SECONDS = "co_response_call_sign_total_service_time_s_"
+    # CALL_SIGN_DISPATCH_TIME = "call_sign_dispatch_time"
+    # CALL_SIGN_ARRIVAL_TIME = "call_sign_at_scene_time"
+    # CALL_SIGN_IN_SERVICE_TIME = "call_sign_in_service_time"
+    # CALL_SIGN_DISPATCH_DELAY_SECONDS = "call_sign_dispatch_delay_time_s_"
+    # CALL_SIGN_RESPONSE_SECONDS = "call_sign_response_time_s_"
+    # CALL_SIGN_SERVICE_SECONDS = "call_sign_total_service_time_s_"
 
 
 PROGRAM_START = date(2023, 10, 26)
 TODAY = datetime.now(tz=ZoneInfo("America/Los_Angeles")).date()
+PAGE_LAST_UPDATED = datetime(
+    2026,
+    9,
+    8,
+    14,
+    29,
+    tzinfo=ZoneInfo("America/Los_Angeles"),
+)
 
 COMPLETED_YEAR_OPTIONS = [
     {
@@ -127,12 +101,6 @@ def dates_are_valid(start_date, end_date):
         date.fromisoformat(start_date)
         <= date.fromisoformat(end_date)
     )
-def optional_float(value):
-    try:
-        return float(value)
-    except (TypeError, ValueError):
-        return None
-
 # Main functions
 @lru_cache(maxsize=32)
 def fetch_event_type_options(start_date, end_date):
@@ -201,22 +169,8 @@ def fetch_events(
     params = {
         "$select": (
             f"{Columns.EVENT_ID}, "
-            f"{Columns.LATITUDE},"
-            f"{Columns.LONGITUDE},"
             f"{Columns.RESPONSE_CATEGORY},"
-            f"{Columns.QUEUED_TIME},"
-            f"{Columns.FINAL_CALL_TYPE},"
-            f"{Columns.CLEARANCE_DESCRIPTION},"
-            f"{Columns.PRIORITY},"
-            f"{Columns.SPD_DISPATCH_DELAY_SECONDS},"
-            f"{Columns.CARE_DISPATCH_DELAY_SECONDS},"
-            f"{Columns.CO_RESPONSE_DISPATCH_DELAY_SECONDS},"
-            f"{Columns.EVENT_FIRST_RESPONSE_SECONDS},"
-            f"{Columns.SPD_TOTAL_SERVICE_SECONDS},"
-            f"{Columns.CARE_TOTAL_SERVICE_SECONDS},"
-            f"{Columns.CO_RESPONSE_TOTAL_SERVICE_SECONDS},"
-            f"{Columns.BEAT},"
-            f"{Columns.NEIGHBORHOOD}"
+            f"{Columns.EVENT_FIRST_RESPONSE_SECONDS}"
         ),
         "$where": (
             f"{Columns.QUEUED_TIME} >= '{start.isoformat()}T00:00:00' "
@@ -237,54 +191,11 @@ def fetch_events(
     results = response.json()
 
 
-    dispatch_delay_field = {
-    "CARE": Columns.CARE_DISPATCH_DELAY_SECONDS,
-    "SPD": Columns.SPD_DISPATCH_DELAY_SECONDS,
-    "SPD/CARE Co-Response": Columns.CO_RESPONSE_DISPATCH_DELAY_SECONDS,
-    }
-
-
-
     for row in results:
         category = row[Columns.RESPONSE_CATEGORY]
-        delay_field = dispatch_delay_field[category]
-
-        raw_delay = row.get(delay_field)
-        row["dispatch_delay_seconds"] = (
-            float(raw_delay) if raw_delay is not None else None
-        )   
-
         response_seconds = float(row[Columns.EVENT_FIRST_RESPONSE_SECONDS])
-
-        raw_delay = row.get(delay_field)
-        dispatch_seconds = ( 
-            float(raw_delay) if raw_delay is not None else None
-        )
-
         row["response_unit"] = category
         row["response_minutes"] = response_seconds / 60
-        row["dispatch_delay_minutes"] = ( 
-            dispatch_seconds / 60 
-            if dispatch_seconds is not None 
-            else None )
-        travel_seconds = (
-            response_seconds - dispatch_seconds
-        )
-        row["travel_minutes"] = (
-            travel_seconds / 60
-            if dispatch_seconds is not None
-            and response_seconds >= dispatch_seconds
-            else None
-        )
-        latitude = row.get(Columns.LATITUDE)
-        longitude = row.get(Columns.LONGITUDE)
-
-        row["latitude"] = optional_float(
-            latitude
-        )
-        row["longitude"] = optional_float(
-            longitude
-        )
     
     print("Rows returned:", len(results))
 
@@ -313,7 +224,7 @@ app.layout = html.Main(
                         {"label": "CARE", "value": "CARE"},
                         {"label": "SPD/CARE co-response", "value": "SPD/CARE Co-Response"},
                     ],
-                    value=["CARE", "SPD/CARE Co-Response"],
+                    value=["CARE", "SPD/CARE Co-Response", "SPD"],
                     multi=True,
                 ),
                 html.Label("Event Type"),
@@ -407,7 +318,18 @@ app.layout = html.Main(
             [
             dcc.Graph(id="response-chart"),
             ], className = "chart-grid"
-        )
+        ),
+        html.Footer(
+            [
+                html.Span("Created by Samuel Buck"),
+                html.Span(" · ", **{"aria-hidden": "true"}),
+                html.Span(
+                    "Page last updated "
+                    f"{PAGE_LAST_UPDATED.strftime('%B %d, %Y at %I:%M %p %Z').replace(' 0', ' ')}"
+                ),
+            ],
+            className="page-footer",
+        ),
     ], className = "filter-grid"
 )
 # Callbacks

@@ -177,3 +177,10 @@ body {
     font-size: 0.875rem;
     font-weight: 600;
 }
+
+.page-footer {
+    padding: 24px 0 8px;
+    color: var(--text-secondary);
+    font-size: 0.82rem;
+    text-align: center;
+}
