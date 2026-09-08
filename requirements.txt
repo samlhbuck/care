@@ -1,1 +1,7 @@
 tzdata
+dash
+gunicorn
+pandas
+plotly
+requests
+tzdata
