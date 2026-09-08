@@ -1,5 +1,5 @@
+from datetime import date, timedelta
 from functools import lru_cache
-from pprint import pprint
 
 import pandas as pd
 import plotly.express as px
@@ -100,31 +100,32 @@ def optional_float(value):
     except (TypeError, ValueError):
         return None
 
-def fetch_event_type_options():
+@lru_cache(maxsize=32)
+def fetch_event_type_options(start_date, end_date):
+    start = date.fromisoformat(start_date)
+    end_exclusive = date.fromisoformat(end_date) + timedelta(days=1)
+
     params = {
         "$select": (
             f"{Columns.INITIAL_CALL_TYPE}, "
-            f"{Columns.CALL_TYPE_INDICATOR}, "
             f"count(distinct {Columns.EVENT_ID}) AS event_count"
         ),
         "$where": (
-            f"{Columns.QUEUED_TIME} >= '2023-10-26T00:00:00' "
+            f"{Columns.QUEUED_TIME} >= '{start.isoformat()}T00:00:00' "
+            f"AND {Columns.QUEUED_TIME} "
+            f"< '{end_exclusive.isoformat()}T00:00:00' "
             f"AND {Columns.RESPONSE_CATEGORY} IN "
             "('CARE', 'SPD/CARE Co-Response') "
             f"AND {Columns.EVENT_FIRST_RESPONSE_SECONDS} IS NOT NULL "
             f"AND {Columns.CALL_TYPE_INDICATOR} = 'DISPATCH'"
         ),
-        "$group": (
-            f"{Columns.INITIAL_CALL_TYPE}, "
-            f"{Columns.CALL_TYPE_INDICATOR}"
-            ),
+        "$group": Columns.INITIAL_CALL_TYPE,
         "$order": "event_count DESC",
         "$limit": 5000,
     }
 
-    response = requests.get(ENDPOINT, params=params, timeout=30)
+    response = requests.get(ENDPOINT, params=params, timeout=(5, 60))
     response.raise_for_status()
-    pprint(response.json())
     results = response.json()
 
    
@@ -140,8 +141,13 @@ def fetch_event_type_options():
     ]
 
 
-@lru_cache(maxsize=8)
-def fetch_events(response_categories, event_type):
+@lru_cache(maxsize=32)
+def fetch_events(
+        response_categories,
+        event_type,
+        start_date,
+        end_date,
+    ):
     allowed_categories = {
         "SPD",
         "CARE",
@@ -154,6 +160,9 @@ def fetch_events(response_categories, event_type):
     quoted_categories = ", ".join(f"'{category}'" for category in selected)
 
     safe_event_type = event_type.replace("'", "''")
+
+    start = date.fromisoformat(start_date)
+    end_exclusive = date.fromisoformat(end_date) + timedelta(days=1)
 
     params = {
         "$select": (
@@ -176,7 +185,9 @@ def fetch_events(response_categories, event_type):
             f"{Columns.NEIGHBORHOOD}"
         ),
         "$where": (
-            f"{Columns.QUEUED_TIME} >= '2023-10-26T00:00:00' "
+            f"{Columns.QUEUED_TIME} >= '{start.isoformat()}T00:00:00' "
+            f"AND {Columns.QUEUED_TIME} "
+            f"< '{end_exclusive.isoformat()}T00:00:00' "
             f"AND {Columns.RESPONSE_CATEGORY} IN ({quoted_categories}) "
             f"AND {Columns.INITIAL_CALL_TYPE} = '{safe_event_type}' "
             f"AND {Columns.EVENT_FIRST_RESPONSE_SECONDS} is not null "
@@ -198,10 +209,12 @@ def fetch_events(response_categories, event_type):
     "SPD/CARE Co-Response": Columns.CO_RESPONSE_DISPATCH_DELAY_SECONDS,
     }
 
+
+
     for row in results:
         category = row[Columns.RESPONSE_CATEGORY]
         delay_field = dispatch_delay_field[category]
-        
+
         raw_delay = row.get(delay_field)
         row["dispatch_delay_seconds"] = (
             float(raw_delay) if raw_delay is not None else None
@@ -244,56 +257,124 @@ def fetch_events(response_categories, event_type):
     return results
 
 
-EVENT_TYPE_OPTIONS = fetch_event_type_options()
 app = Dash(__name__)
 
 
 app.layout = html.Main(
     [
-        html.H1("CARE Response Explorer"),
-        html.P("""Explore how event types have historically
-        moved through Seattle's emergency response system"""),
-        html.Label("Responding Entity"),
-        dcc.Dropdown(
-            id="response-category",
-            options=[
-                {"label": "SPD", "value": "SPD"},
-                {"label": "CARE", "value": "CARE"},
-                {"label": "SPD/CARE co-response", "value": "SPD/CARE Co-Response"},
+        html.Div(
+            [
+                html.H1("CARE Response Explorer"),
+                html.P("""Explore how calls move
+                     through Seattle's emergency response system"""),
+            ], className = "page-header",
+        ),
+        html.Div(
+            [
+                html.Label("Responding Entity"),
+                dcc.Dropdown(
+                    id="response-category",
+                    options=[
+                        {"label": "SPD", "value": "SPD"},
+                        {"label": "CARE", "value": "CARE"},
+                        {"label": "SPD/CARE co-response", "value": "SPD/CARE Co-Response"},
+                    ],
+                    value=["CARE", "SPD/CARE Co-Response"],
+                    multi=True,
+                ),
+            
+                html.Label("Event Type"),
+                dcc.Dropdown(
+                    id="event-type",
+                    options=[],
+                    placeholder="Search event types",
+                    searchable=True,
+                    clearable=True,
+                ),
+                html.Div(
+                    [
+                        html.Div(
+                            [
+                                html.Label("Start date"),
+                                dcc.DatePickerSingle(
+                                    id="start-date",
+                                    min_date_allowed=date(2023, 10, 26),
+                                    max_date_allowed=date.today(),
+                                    date=date(2023, 10, 26),
+                                    display_format="MMM D, YYYY",
+                                    clearable=False,
+                                ),
+                            ],
+                            className="date-field",
+                        ),
+                        html.Div(
+                            [
+                                html.Label("End date"),
+                                dcc.DatePickerSingle(
+                                    id="end-date",
+                                    min_date_allowed=date(2023, 10, 26),
+                                    max_date_allowed=date.today(),
+                                    date=date.today(),
+                                    display_format="MMM D, YYYY",
+                                    clearable=False,
+                                ),
+                                html.Small(
+                                    "Latest available date recommended",
+                                    className="field-hint",
+                                ),
+                            ],
+                            className="date-field"
+                    ),
+                    ],
+                    className="date-fields"
+                ),
             ],
-            value=["CARE", "SPD/CARE Co-Response"],
-            multi=True,
-        ),
-        html.Label("Event Type"),
-        dcc.Dropdown(
-            id="event-type",
-            options=EVENT_TYPE_OPTIONS,
-            placeholder="Search event types",
-            searchable=True,
-            clearable=True,
-        ),
-        dcc.Graph(id="response-chart"),
-    ]
+            className = "filter-grid"),
+
+        html.Div( 
+            [
+            dcc.Graph(id="response-chart"),
+            ], className = "chart-grid"
+        )
+    ], className = "filter-grid"
 )
+
+
+@callback(
+    Output("event-type", "options"),
+    Input("start-date", "date"),
+    Input("end-date", "date"),
+)
+def update_event_type_options(start_date, end_date):
+    if not start_date or not end_date:
+        return []
+
+    return fetch_event_type_options(start_date, end_date)
 
 
 @callback(
     Output("response-chart", "figure"),
     Input("response-category", "value"),
     Input("event-type", "value"),
+    Input("start-date", "date"),
+    Input("end-date", "date"),
 )
-def update_chart(response_categories, event_type):
+def update_dashboard(response_categories, event_type, start_date, end_date):
     if not response_categories:
         return px.bar(title="Select at least one category")
 
     if not event_type:
         return px.bar(title="Select an event type")
 
-    events = fetch_events(
-        tuple(sorted(response_categories)), event_type
-    )
-    events = fetch_events(tuple(sorted(response_categories)), event_type)
+    if not start_date or not end_date:
+        return px.bar(title="Select a date range")
 
+    events = fetch_events(
+        tuple(sorted(response_categories)),
+        event_type,
+        start_date,
+        end_date,
+    )
     if not events:
         return px.bar(title=f"No response data found for: {event_type}")
 
@@ -339,6 +420,17 @@ def update_chart(response_categories, event_type):
     }
     
     response_figure = go.Figure()
+
+    response_figure.update_layout(
+        template="plotly_white",
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        font={
+            "family": "Inter, system-ui, sans-serif",
+            "color": "#18324a",
+        },
+        margin={"l": 110, "r": 30, "t": 80, "b": 60},
+    )
 
     response_figure.add_trace(
         go.Scatter(
