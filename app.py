@@ -1,8 +1,9 @@
 from functools import lru_cache
-
+from pprint import pprint
+from datetime import date, timedelta
+import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
-import pandas as pd
 import requests
 from dash import Dash, Input, Output, callback, dcc, html
 
@@ -13,6 +14,7 @@ class Columns:
     # Event identity and classification
     EVENT_ID = "cad_event_number"
     RESPONSE_CATEGORY = "cad_event_response_category"
+    CALL_TYPE_INDICATOR = "call_type_indicator"
     INITIAL_CALL_TYPE = "initial_call_type"
     FINAL_CALL_TYPE = "final_call_type"
     EVENT_GROUP = "event_group"
@@ -102,21 +104,27 @@ def fetch_event_type_options():
     params = {
         "$select": (
             f"{Columns.INITIAL_CALL_TYPE}, "
+            f"{Columns.CALL_TYPE_INDICATOR}, "
             f"count(distinct {Columns.EVENT_ID}) AS event_count"
         ),
         "$where": (
             f"{Columns.QUEUED_TIME} >= '2023-10-26T00:00:00' "
             f"AND {Columns.RESPONSE_CATEGORY} IN "
             "('CARE', 'SPD/CARE Co-Response') "
-            f"AND {Columns.EVENT_FIRST_RESPONSE_SECONDS} IS NOT NULL"
+            f"AND {Columns.EVENT_FIRST_RESPONSE_SECONDS} IS NOT NULL "
+            f"AND {Columns.CALL_TYPE_INDICATOR} = 'DISPATCH'"
         ),
-        "$group": Columns.INITIAL_CALL_TYPE,
+        "$group": (
+            f"{Columns.INITIAL_CALL_TYPE}, "
+            f"{Columns.CALL_TYPE_INDICATOR}"
+            ),
         "$order": "event_count DESC",
         "$limit": 5000,
     }
 
     response = requests.get(ENDPOINT, params=params, timeout=30)
     response.raise_for_status()
+    pprint(response.json())
     results = response.json()
 
    
@@ -124,7 +132,7 @@ def fetch_event_type_options():
         {
             "label": (
                 f"{row[Columns.INITIAL_CALL_TYPE]} "
-                f"({row['num_events']} CARE-related events)"
+                f"({row['event_count']} CARE-related events)"
             ),
             "value": row[Columns.INITIAL_CALL_TYPE],
         }
@@ -149,7 +157,7 @@ def fetch_events(response_categories, event_type):
 
     params = {
         "$select": (
-            f"distinct {Columns.EVENT_ID}, "
+            f"{Columns.EVENT_ID}, "
             f"{Columns.LATITUDE},"
             f"{Columns.LONGITUDE},"
             f"{Columns.RESPONSE_CATEGORY},"
@@ -172,6 +180,7 @@ def fetch_events(response_categories, event_type):
             f"AND {Columns.RESPONSE_CATEGORY} IN ({quoted_categories}) "
             f"AND {Columns.INITIAL_CALL_TYPE} = '{safe_event_type}' "
             f"AND {Columns.EVENT_FIRST_RESPONSE_SECONDS} is not null "
+            f"AND {Columns.CALL_TYPE_INDICATOR} = 'DISPATCH' "
         ),
         "$limit": 50000,
         "$order": f"{Columns.EVENT_ID}"
@@ -283,6 +292,11 @@ def update_chart(response_categories, event_type):
     events = fetch_events(
         tuple(sorted(response_categories)), event_type
     )
+    events = fetch_events(tuple(sorted(response_categories)), event_type)
+
+    if not events:
+        return px.bar(title=f"No response data found for: {event_type}")
+
     event_frame = pd.DataFrame(events)
 
     summary = (
