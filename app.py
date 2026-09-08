@@ -101,18 +101,17 @@ def optional_float(value):
 def fetch_event_type_options():
     params = {
         "$select": (
-        f"{Columns.INITIAL_CALL_TYPE}, "
-        f"count(distinct {Columns.EVENT_ID}) as num_events"
+            f"{Columns.INITIAL_CALL_TYPE}, "
+            f"count(distinct {Columns.EVENT_ID}) AS event_count"
         ),
         "$where": (
-            "cad_event_original_time_queued >= '2023-10-26T00:00:00' "
-            f"AND {Columns.INITIAL_CALL_TYPE} IS NOT NULL "
-            f"AND {Columns.RESPONSE_CATEGORY} like '%CARE%' "
-            f"AND {Columns.EVENT_FIRST_RESPONSE_SECONDS} > 60"
+            f"{Columns.QUEUED_TIME} >= '2023-10-26T00:00:00' "
+            f"AND {Columns.RESPONSE_CATEGORY} IN "
+            "('CARE', 'SPD/CARE Co-Response') "
+            f"AND {Columns.EVENT_FIRST_RESPONSE_SECONDS} IS NOT NULL"
         ),
-        "$group": f"{Columns.INITIAL_CALL_TYPE} ",
-        "$order": "num_events DESC,"
-        f"{Columns.INITIAL_CALL_TYPE} ASC",
+        "$group": Columns.INITIAL_CALL_TYPE,
+        "$order": "event_count DESC",
         "$limit": 5000,
     }
 
@@ -284,6 +283,35 @@ def update_chart(response_categories, event_type):
     events = fetch_events(
         tuple(sorted(response_categories)), event_type
     )
+    event_frame = pd.DataFrame(events)
+
+    summary = (
+        event_frame.groupby("response_unit", as_index=False)
+        .agg(
+            event_count=(Columns.EVENT_ID, "nunique"),
+            q1=("response_minutes", lambda values: values.quantile(0.25)),
+            median=("response_minutes", "median"),
+            q3=("response_minutes", lambda values: values.quantile(0.75)),
+            p90=("response_minutes", lambda values: values.quantile(0.90)),
+        )
+    )
+
+    short_names = {
+        "SPD": "SPD",
+        "CARE": "CARE",
+        "SPD/CARE Co-Response": "Co-response",
+    }
+
+    summary["display_label"] = summary.apply(
+        lambda row: (
+            f"{short_names[row['response_unit']]} "
+            f"(n={row['event_count']:,})"
+        ),
+        axis=1,
+    )
+
+    summary["q3_distance"] = summary["q3"] - summary["median"]
+    summary["q1_distance"] = summary["median"] - summary["q1"]
 
     if not events:
         return px.bar(
@@ -295,61 +323,62 @@ def update_chart(response_categories, event_type):
         "CARE": "CARE",
         "SPD/CARE Co-Response": "Co-response",
     }
-
-    event_ids_by_category = {}
-
-    for row in events:
-        category = row["response_unit"]
-
-        event_ids_by_category.setdefault(category, set()).add(
-            row[Columns.EVENT_ID]
-        )
-
-    counts = {
-        category: len(event_ids)
-        for category, event_ids in event_ids_by_category.items()
-    }
-
-    for row in events:
-        category = row["response_unit"]
-        row["response_label"] = (
-            f"{short_names[category]}<br>"
-            f"n={counts[category]:,}"
-        )
     
-    positive_events = [
-        row
-        for row in events
-        if row["response_minutes"] > 0
-    ]
-    
-    response_figure = px.box(
-        positive_events,
-        x="response_label",
-        y="response_minutes",
-        color="response_unit",
-        points="outliers",
-        title=f"Response time — {event_type}",
-        labels={
-            "response_label": "",
-            "response_minutes": "Response time (minutes)",
-        },
+    response_figure = go.Figure()
+
+    response_figure.add_trace(
+        go.Scatter(
+            x=summary["median"],
+            y=summary["display_label"],
+            mode="markers",
+            marker={
+                "size": 13,
+                "color": "#275d8c",
+            },
+            error_x={
+                "type": "data",
+                "symmetric": False,
+                "array": summary["q3_distance"],
+                "arrayminus": summary["q1_distance"],
+                "thickness": 6,
+                "width": 0,
+                "color": "#82a9ca",
+            },
+            customdata=summary[
+                ["q1", "q3", "p90", "event_count"]
+            ].to_numpy(),
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                "Median: %{x:.1f} minutes<br>"
+                "25th percentile: %{customdata[0]:.1f}<br>"
+                "75th percentile: %{customdata[1]:.1f}<br>"
+                "90th percentile: %{customdata[2]:.1f}<br>"
+                "Events: %{customdata[3]:,.0f}"
+                "<extra></extra>"
+            ),
+            name="Median and middle 50%",
+        )
     )
 
-    response_figure.update_traces(
-        hoveron="boxes+points",
-        hovertemplate=None,
+    response_figure.add_trace(
+        go.Scatter(
+            x=summary["p90"],
+            y=summary["display_label"],
+            mode="markers",
+            marker={
+                "size": 11,
+                "symbol": "diamond-open",
+                "color": "#b44b39",
+                "line": {"width": 2},
+            },
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                "90% responded within %{x:.1f} minutes"
+                "<extra></extra>"
+            ),
+            name="90th percentile",
+        )
     )
-    short_names = {
-        "SPD": "SPD",
-        "CARE": "CARE",
-        "SPD/CARE Co-Response": "Co-response",
-    }
-
-    for trace in response_figure.data:
-        trace.name = short_names.get(trace.name, trace.name)
-
-    response_figure.update_layout(showlegend=False)
     
     return response_figure
 
