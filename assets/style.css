@@ -162,3 +162,18 @@ body {
         padding: 15px;
     }
 }
+
+.loading-status {
+    min-height: 1.25rem;
+    margin-top: 0.35rem;
+    color: #526579;
+    font-size: 0.875rem;
+}
+
+.form-error {
+    min-height: 1.25rem;
+    margin-top: 0.35rem;
+    color: #b42318;
+    font-size: 0.875rem;
+    font-weight: 600;
+}

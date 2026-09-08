@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import requests
-from dash import Dash, Input, Output, callback, dcc, html
+from dash import Dash, Input, Output, callback, dcc, html, no_update
 
 ENDPOINT = "https://data.seattle.gov/resource/33kz-ixgy.json"
 
@@ -93,6 +93,28 @@ class Columns:
     )
     CALL_SIGN_RESPONSE_SECONDS = "call_sign_response_time_s_"
     CALL_SIGN_SERVICE_SECONDS = "call_sign_total_service_time_s_"
+
+
+PROGRAM_START = date(2023, 10, 26)
+TODAY = date.today()
+
+COMPLETED_YEAR_OPTIONS = [
+    {
+        "label": str(year),
+        "value": f"year-{year}",
+    }
+    for year in range(TODAY.year - 1, 2023, -1)
+]
+
+TIME_PERIOD_OPTIONS = [
+    {"label": "Full program", "value": "full-program"},
+    {"label": "Last 90 days", "value": "last-90-days"},
+    {"label": "Last 365 days", "value": "last-365-days"},
+    {"label": "Year to date", "value": "year-to-date"},
+    {"label": "Previous quarter", "value": "previous-quarter"},
+    *COMPLETED_YEAR_OPTIONS,
+    {"label": "Custom dates", "value": "custom"},
+]
 
 def optional_float(value):
     try:
@@ -309,6 +331,20 @@ app.layout = html.Main(
                 ),
                 html.Div(
                     [
+                        html.Label("Time period"),
+                        dcc.Dropdown(
+                            id="time-period",
+                            options=TIME_PERIOD_OPTIONS,
+                            value="full-program",
+                            clearable=False,
+                            searchable=False,
+                        ),
+                    ],
+                    className="time-period-field",
+                ),
+                html.Div(
+                    [
+                        
                         html.Div(
                             [
                                 html.Label("Start date"),
@@ -318,7 +354,9 @@ app.layout = html.Main(
                                     max_date_allowed=date.today(),
                                     date=date(2023, 10, 26),
                                     display_format="MMM D, YYYY",
+                                    month_format="YYYY MMMM",
                                     clearable=False,
+                                    disabled=True,
                                 ),
                             ],
                             className="date-field",
@@ -332,7 +370,9 @@ app.layout = html.Main(
                                     max_date_allowed=date.today(),
                                     date=date.today(),
                                     display_format="MMM D, YYYY",
+                                    month_format="YYYY MMMM",
                                     clearable=False,
+                                    disabled=True,
                                 ),
                                 html.Small(
                                     "Latest available date recommended",
@@ -355,6 +395,57 @@ app.layout = html.Main(
     ], className = "filter-grid"
 )
 
+@callback(
+    Output("start-date", "date"),
+    Output("end-date", "date"),
+    Output("start-date", "disabled"),
+    Output("end-date", "disabled"),
+    Input("time-period", "value"),
+    prevent_initial_call=True,
+)
+def update_date_range(time_period):
+    today = date.today()
+
+    if time_period == "custom":
+        return no_update, no_update, False, False
+
+    if time_period == "full-program":
+        start = PROGRAM_START
+        end = today
+
+    elif time_period == "last-90-days":
+        start = today - timedelta(days=89)
+        end = today
+
+    elif time_period == "last-365-days":
+        start = today - timedelta(days=364)
+        end = today
+
+    elif time_period == "year-to-date":
+        start = date(today.year, 1, 1)
+        end = today
+
+    elif time_period == "previous-quarter":
+        current_quarter_month = 3 * ((today.month - 1) // 3) + 1
+        current_quarter_start = date(
+            today.year,
+            current_quarter_month,
+            1,
+        )
+
+        end = current_quarter_start - timedelta(days=1)
+        previous_quarter_month = 3 * ((end.month - 1) // 3) + 1
+        start = date(end.year, previous_quarter_month, 1)
+
+    elif time_period.startswith("year-"):
+        year = int(time_period.removeprefix("year-"))
+        start = date(year, 1, 1)
+        end = date(year, 12, 31)
+
+    else:
+        return no_update, no_update, True, True
+
+    return start.isoformat(), end.isoformat(), True, True
 
 @callback(
         Output("event-type", "options"),
