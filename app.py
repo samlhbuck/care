@@ -282,14 +282,30 @@ app.layout = html.Main(
                     value=["CARE", "SPD/CARE Co-Response"],
                     multi=True,
                 ),
-            
                 html.Label("Event Type"),
-                dcc.Dropdown(
-                    id="event-type",
-                    options=[],
-                    placeholder="Search event types",
-                    searchable=True,
-                    clearable=True,
+                html.Div(
+                    [
+                        dcc.Loading(
+                            id="event-type-loading",
+                            type="circle",
+                            delay_show=250,
+                            delay_hide=150,
+                            children=dcc.Dropdown(
+                                id="event-type",
+                                options=[],
+                                placeholder="Search event types",
+                                searchable=True,
+                                clearable=True,
+                            ),
+                        ),
+                        html.Div(
+                            id="event-type-status",
+                            className="loading-status",
+                            role="status",
+                            **{"aria-live": "polite"},
+                        ),
+                    ],
+                    className="event-type-field",
                 ),
                 html.Div(
                     [
@@ -341,10 +357,18 @@ app.layout = html.Main(
 
 
 @callback(
-    Output("event-type", "options"),
-    Input("start-date", "date"),
-    Input("end-date", "date"),
-)
+        Output("event-type", "options"),
+        Input("start-date", "date"),
+        Input("end-date", "date"),
+        running=[
+            (Output("event-type", "disabled"), True, False),
+            (
+                Output("event-type-status", "children"),
+                "Loading event types…",
+                "",
+            ),
+        ],
+    )
 def update_event_type_options(start_date, end_date):
     if not start_date or not end_date:
         return []
