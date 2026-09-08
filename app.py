@@ -321,7 +321,7 @@ app.layout = html.Main(
         ),
         html.Footer(
             [
-                html.Span("Created by Samuel Buck"),
+                html.Span("Created by Samuel Buck (github: samlhbuck)"),
                 html.Span(" · ", **{"aria-hidden": "true"}),
                 html.Span(
                     "Page last updated "
