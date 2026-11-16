@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 from functools import lru_cache
+import logging
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -9,6 +10,29 @@ import requests
 from dash import Dash, Input, Output, callback, dcc, html, no_update
 
 ENDPOINT = "https://data.seattle.gov/resource/33kz-ixgy.json"
+logger = logging.getLogger(__name__)
+
+
+def get_source_rows(params):
+    """Retry one transient connection failure before surfacing an API error."""
+    for attempt in range(2):
+        try:
+            response = requests.get(
+                ENDPOINT,
+                params=params,
+                timeout=(5, 60),
+            )
+            response.raise_for_status()
+            return response.json()
+        except (requests.exceptions.Timeout, requests.exceptions.ConnectionError):
+            logger.warning(
+                "Seattle Open Data connection failed (attempt %s of 2)",
+                attempt + 1,
+                exc_info=True,
+            )
+            if attempt == 1:
+                raise
+
 
 
 class Columns:
@@ -117,9 +141,7 @@ def fetch_event_type_options(start_date, end_date):
         "$limit": 5000,
     }
 
-    response = requests.get(ENDPOINT, params=params, timeout=(5, 60))
-    response.raise_for_status()
-    results = response.json()
+    results = get_source_rows(params)
 
    
     return [
@@ -176,10 +198,7 @@ def fetch_events(
         "$order": f"{Columns.EVENT_ID}"
     }
 
-    response = requests.get(ENDPOINT, params=params, timeout=30)
-    response.raise_for_status()
-
-    results = response.json()
+    results = get_source_rows(params)
 
 
     for row in results:
@@ -414,26 +433,29 @@ def update_date_range(time_period):
     return start.isoformat(), end.isoformat(), True, True
 
 @callback(
-        Output("event-type", "options"),
-        Input("start-date", "date"),
-        Input("end-date", "date"),
-        running=[
-            (Output("event-type", "disabled"), True, False),
-            (
-                Output("event-type-status", "children"),
-                "Loading event types…",
-                "",
-            ),
-        ],
-    )
+    Output("event-type", "options"),
+    Output("event-type-status", "children"),
+    Input("start-date", "date"),
+    Input("end-date", "date"),
+    running=[
+        (Output("event-type", "disabled"), True, False),
+    ],
+)
 def update_event_type_options(start_date, end_date):
     if not start_date or not end_date:
-        return []
-    
-    if not dates_are_valid(start_date, end_date):
-        return no_update
+        return [], "Choose a valid date range."
 
-    return fetch_event_type_options(start_date, end_date)
+    if not dates_are_valid(start_date, end_date):
+        return no_update, "Start date must precede end date."
+
+    try:
+        return fetch_event_type_options(start_date, end_date), ""
+    except requests.exceptions.RequestException:
+        logger.exception("Could not load CARE event types from Seattle Open Data")
+        return [], (
+            "Seattle Open Data is temporarily unavailable. "
+            "Try reloading the page or selecting another time period."
+        )
 
 
 @callback(
@@ -456,12 +478,18 @@ def update_dashboard(response_categories, event_type, start_date, end_date):
     if not dates_are_valid(start_date, end_date):
         return no_update
 
-    events = fetch_events(
-        tuple(sorted(response_categories)),
-        event_type,
-        start_date,
-        end_date,
-    )
+    try:
+        events = fetch_events(
+            tuple(sorted(response_categories)),
+            event_type,
+            start_date,
+            end_date,
+        )
+    except requests.exceptions.RequestException:
+        logger.exception("Could not load response events from Seattle Open Data")
+        return px.bar(
+            title="Seattle Open Data is temporarily unavailable; please retry."
+        )
     if not events:
         return px.bar(title=f"No response data found for: {event_type}")
 
