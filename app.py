@@ -64,15 +64,6 @@ class Columns:
 
 PROGRAM_START = date(2023, 10, 26)
 TODAY = datetime.now(tz=ZoneInfo("America/Los_Angeles")).date()
-PAGE_LAST_UPDATED = datetime(
-    2026,
-    9,
-    8,
-    14,
-    29,
-    tzinfo=ZoneInfo("America/Los_Angeles"),
-)
-
 COMPLETED_YEAR_OPTIONS = [
     {
         "label": str(year),
@@ -118,7 +109,7 @@ def fetch_event_type_options(start_date, end_date):
             f"< '{end_exclusive.isoformat()}T00:00:00' "
             f"AND {Columns.RESPONSE_CATEGORY} IN "
             "('CARE', 'SPD/CARE Co-Response') "
-            f"AND {Columns.EVENT_FIRST_RESPONSE_SECONDS} IS NOT NULL "
+            f"AND {Columns.EVENT_FIRST_RESPONSE_SECONDS} >= 60 "
             f"AND {Columns.CALL_TYPE_INDICATOR} = 'DISPATCH'"
         ),
         "$group": Columns.INITIAL_CALL_TYPE,
@@ -178,7 +169,7 @@ def fetch_events(
             f"< '{end_exclusive.isoformat()}T00:00:00' "
             f"AND {Columns.RESPONSE_CATEGORY} IN ({quoted_categories}) "
             f"AND {Columns.INITIAL_CALL_TYPE} = '{safe_event_type}' "
-            f"AND {Columns.EVENT_FIRST_RESPONSE_SECONDS} is not null "
+            f"AND {Columns.EVENT_FIRST_RESPONSE_SECONDS} >= 60 "
             f"AND {Columns.CALL_TYPE_INDICATOR} = 'DISPATCH' "
         ),
         "$limit": 50000,
@@ -210,8 +201,10 @@ app.layout = html.Main(
         html.Div(
             [
                 html.H1("CARE Response Explorer"),
-                html.P("""Explore how calls move
-                     through Seattle's emergency response system"""),
+                html.P(
+                    "How does the time to first unit arrival vary by recorded "
+                    "response category for the same initial call type?"
+                ),
             ], className = "page-header",
         ),
         html.Div(
@@ -297,7 +290,7 @@ app.layout = html.Main(
                                     disabled=True,
                                 ),
                                 html.Small(
-                                    "Latest available date recommended",
+                                    "The latest published records may lag today's date.",
                                     className="field-hint",
                                 ),
                             ],
@@ -314,18 +307,35 @@ app.layout = html.Main(
             ],
             className = "filter-grid"),
 
-        html.Div( 
+        html.Div(
             [
-            dcc.Graph(id="response-chart"),
-            ], className = "chart-grid"
+                dcc.Graph(id="response-chart"),
+                html.P(
+                    "A dot marks the median time from a call entering CAD to the first "
+                    "unit arriving. The pale bar spans the middle 50% of events; "
+                    "the open diamond marks the 90th percentile.",
+                    className="chart-explanation",
+                ),
+                html.P(
+                    "Scope: dispatched events only, grouped by INITIAL call type. "
+                    "Records with missing or under-one-minute response times are "
+                    "excluded. In co-response, the first arriving unit may be SPD "
+                    "or CARE. These unadjusted groups are not a measure of program "
+                    "effectiveness.",
+                    className="method-note",
+                ),
+            ],
+            className="chart-grid",
         ),
         html.Footer(
             [
-                html.Span("Created by Samuel Buck | Github: samlhbuck | samlhbuck@gmail.com)"),
+                html.Span("Created by Samuel Buck · Independent analysis"),
                 html.Span(" · ", **{"aria-hidden": "true"}),
-                html.Span(
-                    "Page last updated "
-                    f"{PAGE_LAST_UPDATED.strftime('%B %d, %Y at %I:%M %p %Z').replace(' 0', ' ')}"
+                html.A(
+                    "Seattle Open Data: Call Data",
+                    href="https://data.seattle.gov/Public-Safety/Call-Data/33kz-ixgy",
+                    target="_blank",
+                    rel="noopener noreferrer",
                 ),
             ],
             className="page-footer",
@@ -371,7 +381,7 @@ def update_date_range(time_period):
     
     elif time_period == "previous-90-days":
         start = today - timedelta(days=179)
-        end = today - timedelta(days=89)
+        end = today - timedelta(days=90)
 
     elif time_period == "last-365-days":
         start = today - timedelta(days=364)
@@ -455,7 +465,11 @@ def update_dashboard(response_categories, event_type, start_date, end_date):
     if not events:
         return px.bar(title=f"No response data found for: {event_type}")
 
-    event_frame = pd.DataFrame(events)
+    # The event-level response field can repeat across dispatched unit rows.
+    # Count each CAD event once per response category for quantiles as well as n.
+    event_frame = pd.DataFrame(events).drop_duplicates(
+        subset=[Columns.EVENT_ID, "response_unit"]
+    )
 
     summary = (
         event_frame.groupby("response_unit", as_index=False)
@@ -499,6 +513,7 @@ def update_dashboard(response_categories, event_type, start_date, end_date):
     response_figure = go.Figure()
 
     response_figure.update_layout(
+        title=f"First unit arrival: {event_type}",
         template="plotly_white",
         paper_bgcolor="white",
         plot_bgcolor="white",
@@ -563,6 +578,11 @@ def update_dashboard(response_categories, event_type, start_date, end_date):
         )
     )
     
+    response_figure.update_xaxes(
+        title_text="Minutes: event queued → first unit on scene",
+        rangemode="tozero",
+    )
+
     return response_figure
 
 
